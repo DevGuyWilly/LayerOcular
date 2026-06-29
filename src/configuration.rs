@@ -1,0 +1,93 @@
+use serde_aux::field_attributes::deserialize_number_from_string;
+use secrecy::{ExposeSecret, SecretString};
+
+
+pub enum Environment {
+    Development,
+    Staging,
+    Production
+}
+
+impl Environment {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Environment::Development => "development",
+            Environment::Staging => "staging",
+            Environment::Production => "production"
+        }
+    }
+}
+
+// Move to Util File > 'util'
+fn parse_environment(s: &str) -> Environment {
+    match s.to_lowercase().as_str() {
+        "development" => Environment::Development,
+        "staging" => Environment::Staging,
+        "production" => Environment::Production,
+        other => panic!("Invalid environment: {}", other),
+    }
+}
+
+//  TODO :: Might not need anymore, as 'parse_environment' does similar function
+impl TryFrom<String> for Environment {
+    type Error = String;
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        match s.to_lowercase().as_str() {
+            "development" => Ok(Self::Development),
+            "staging" => Ok(Self::Staging),
+            "production" => Ok(Self::Production),
+            other => Err(format!(
+                "{} is not a supported environment. Use either `local` or `production`.",
+                other
+            )),
+        }
+    }
+}
+
+#[derive(serde::Deserialize, Clone)]
+pub struct Settings {
+    pub application: ApplicationSettings,
+}
+
+#[derive(serde::Deserialize, Clone)]
+pub struct  ApplicationSettings {
+    #[serde(deserialize_with ="deserialize_number_from_string")]
+    pub port : u16,
+    pub host: String,
+    pub base_url: String,
+    pub hmac_secret: SecretString,
+}
+
+// TODO :: DatabaseSettings
+
+
+pub fn get_configuration() -> Result<Settings, config::ConfigError>{
+    let base_path = std::env::current_dir().expect("Failed to determine current working directory");
+    let configuration_directory = base_path.join("configuration");
+
+    //Detect the running environment
+    let environment : Environment = std::env::var("APP_ENVIRONMENT")
+        .unwrap_or_else(|_| "local".into())
+        .try_into()
+        .expect("Failed to parse APP_ENVIRONMENT");
+
+    let environment_filename = format!("{}.yaml", environment.as_str());
+
+    let settings = config::Config::builder()
+        .add_source(config::File::from(
+            configuration_directory.join("base.yaml"),
+        ))
+        .add_source(config::File::from(
+            configuration_directory.join(environment_filename),
+        ))
+        // Add in settings from environment variables (with a prefix of APP and '__' as separator)
+        // E.g. `APP_APPLICATION__PORT=5001 would set `Settings.application.port`
+        .add_source(
+            config::Environment::with_prefix("APP")
+                .prefix_separator("_")
+                .separator("__"),
+        )
+        .build()?;
+
+    settings.try_deserialize::<Settings>()
+}
