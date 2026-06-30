@@ -4,6 +4,8 @@ use actix_web::{web, App, HttpServer};
 use actix_web::{web::Data, dev::Server};
 use secrecy::SecretString;
 use crate::routes::{home};
+use crate::routes::{transactions, bank_connect, authentication};
+
 
 pub struct Application {
     port : u16,
@@ -48,7 +50,15 @@ async fn run(
     // TODO:: Define my routes, for now '/' endpoint
     let server = HttpServer::new(|| {
         App::new()
+            // Root Route, homepage
             .route("/", web::get().to(home))
+
+            // API Versioned Route
+            .service(web::scope("/api/v1")
+                .configure(authentication::init)
+                .configure(transactions::init)
+                .configure(bank_connect::init)
+            )
     })
         .listen(listener)?
         .run();
