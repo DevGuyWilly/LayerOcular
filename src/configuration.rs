@@ -1,5 +1,5 @@
 use serde_aux::field_attributes::deserialize_number_from_string;
-use secrecy::{ExposeSecret, SecretString};
+use secrecy::{SecretString};
 
 
 pub enum Environment {
