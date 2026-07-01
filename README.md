@@ -22,6 +22,12 @@ The original idea connects to bank accounts through TrueLayer, ingests recent tr
 * **`GET `** `/api/v1/transactions`
 * **`GET `** `/api/v1/transactions/count`
 
+### Chats
+* **`POST`** `/api/v1/chats`
+* **`POST`** `/api/v1/chats/{chat_id}`
+* **`GET`** `/api/v1/chats/{chat_id}`
+* **`GET`** `/api/v1/chats`
+
 ---
 
 > **Note:** This project is currently being rebuilt as a personal Java project in Rust.

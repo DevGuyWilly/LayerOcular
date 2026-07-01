@@ -5,6 +5,11 @@ use layer_ocular::startup::Application;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    // TODO :: Initiate Tracing Subscribers
+    tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::INFO)
+        .init();
+
     let configuration = get_configuration().expect("Failed to read configuration.");
     let application = Application::build(configuration.clone()).await?;
 
@@ -19,9 +24,11 @@ async fn main() -> anyhow::Result<()> {
 
 fn report_exit(task_name: &str, outcome: Result<Result<(), impl Debug + Display>, JoinError>) {
     match outcome {
+
         Ok(Ok(())) => {
             tracing::info!("{} has exited", task_name)
         }
+
         Ok(Err(e)) => {
             tracing::error!(
                 error.cause_chain = ?e,
@@ -30,6 +37,7 @@ fn report_exit(task_name: &str, outcome: Result<Result<(), impl Debug + Display>
                 task_name
             )
         }
+
         Err(e) => {
             tracing::error!(
                 error.cause_chain = ?e,

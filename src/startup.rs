@@ -3,6 +3,7 @@ use std::net::TcpListener;
 use actix_web::{web, App, HttpServer};
 use actix_web::{web::Data, dev::Server};
 use secrecy::SecretString;
+use tracing_actix_web::TracingLogger;
 use crate::routes::{home};
 use crate::routes::{transactions, bank_connect, authentication};
 
@@ -48,8 +49,11 @@ async fn run(
     let _hmac_secret = hmac_secret;
 
     // TODO:: Define my routes, for now '/' endpoint
-    let server = HttpServer::new(|| {
+    let server = HttpServer::new(move || {
         App::new()
+            // Auto Instrument every request
+            .wrap(TracingLogger::default())
+
             // Root Route, homepage
             .route("/", web::get().to(home))
 
