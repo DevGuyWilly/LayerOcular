@@ -1,16 +1,17 @@
 use std::fmt::{Debug, Display};
 use tokio::task::JoinError;
-use layer_ocular::configuration::get_configuration;
+use layer_ocular::configuration::{get_configuration, };
 use layer_ocular::startup::Application;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // TODO :: Initiate Tracing Subscribers
+    // TODO :: Initiate Tracing Subscriber
     tracing_subscriber::fmt()
         .with_max_level(tracing::Level::INFO)
         .init();
 
     let configuration = get_configuration().expect("Failed to read configuration.");
+
     let application = Application::build(configuration.clone()).await?;
 
     let application_task = tokio::spawn(application.run_until_stopped());

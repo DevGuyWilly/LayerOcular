@@ -1,12 +1,14 @@
-use crate::configuration::{Settings};
+use crate::configuration::{Settings, DatabaseSettings};
 use std::net::TcpListener;
 use actix_web::{web, App, HttpServer};
 use actix_web::{web::Data, dev::Server};
-use secrecy::SecretString;
+use actix_web::cookie::Key;
+use secrecy::{ExposeSecret, SecretString};
 use tracing_actix_web::TracingLogger;
 use crate::routes::{home};
-use crate::routes::{transactions, bank_connect, authentication};
-
+use crate::routes::{transactions, bank_connect, authentication, chat};
+use sqlx::postgres::PgPoolOptions;
+use sqlx::PgPool;
 
 pub struct Application {
     port : u16,
@@ -15,8 +17,15 @@ pub struct Application {
 
 pub struct ApplicationBaseUrl(pub String);
 
+// Have a quick look over here again
+#[derive(Clone)]
+pub struct HmacSecret(pub SecretString);
+
 impl Application {
     pub async fn build(configuration : Settings) -> Result<Self, anyhow::Error> {
+
+        // Connection Pool
+        let connection_pool = get_connection_pool(&configuration.database);
 
         let address = format!("{}:{}",
                               configuration.application.host,
@@ -27,6 +36,7 @@ impl Application {
 
         let server = run(
             listener,
+            connection_pool,
             configuration.application.base_url,
             configuration.application.hmac_secret,
         ).await?;
@@ -39,14 +49,23 @@ impl Application {
     }
 }
 
+pub fn get_connection_pool(configuration: &DatabaseSettings) -> PgPool {
+    PgPoolOptions::new().connect_lazy_with(configuration.connect_options())
+}
+
 async fn run(
     listener : TcpListener,
+    db_pool: PgPool,
     base_url : String,
     hmac_secret: SecretString,
 ) -> Result<Server, anyhow::Error> {
 
+    let db_pool = Data::new(db_pool);
+
     let base_url = Data::new(ApplicationBaseUrl(base_url));
-    let _hmac_secret = hmac_secret;
+
+    // Have a quick look over here again
+    let secret_key = Key::from(hmac_secret.expose_secret().as_bytes());
 
     // TODO:: Define my routes, for now '/' endpoint
     let server = HttpServer::new(move || {
@@ -62,7 +81,12 @@ async fn run(
                 .configure(authentication::init)
                 .configure(transactions::init)
                 .configure(bank_connect::init)
+                .configure(chat::init)
             )
+            .app_data(db_pool.clone())
+            .app_data(base_url.clone())
+            // Have a quick look over here again
+            .app_data(Data::new(HmacSecret(hmac_secret.clone())))
     })
         .listen(listener)?
         .run();

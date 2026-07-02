@@ -1,5 +1,6 @@
 use serde_aux::field_attributes::deserialize_number_from_string;
-use secrecy::{SecretString};
+use secrecy::{ExposeSecret, SecretString};
+use sqlx::postgres::{ PgConnectOptions, PgSslMode};
 
 
 pub enum Environment {
@@ -47,6 +48,7 @@ impl TryFrom<String> for Environment {
 #[derive(serde::Deserialize, Clone)]
 pub struct Settings {
     pub application: ApplicationSettings,
+    pub database: DatabaseSettings,
 }
 
 #[derive(serde::Deserialize, Clone)]
@@ -59,7 +61,33 @@ pub struct  ApplicationSettings {
 }
 
 // TODO :: DatabaseSettings
+#[derive(serde::Deserialize, Clone)]
+pub struct DatabaseSettings {
+    pub username: String,
+    pub password: SecretString,
+    pub host: String,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    pub port: u16,
+    pub database_name: String,
+    pub require_ssl: bool,
+}
 
+impl DatabaseSettings {
+    pub fn connect_options(&self) -> PgConnectOptions {
+        let ssl_mode = if self.require_ssl {
+            PgSslMode::Require
+        } else {
+            PgSslMode::Prefer
+        };
+        PgConnectOptions::new()
+            .host(&self.host)
+            .username(&self.username)
+            .password(self.password.expose_secret())
+            .port(self.port)
+            .ssl_mode(ssl_mode)
+            .database(&self.database_name)
+    }
+}
 
 pub fn get_configuration() -> Result<Settings, config::ConfigError>{
     let base_path = std::env::current_dir().expect("Failed to determine current working directory");
